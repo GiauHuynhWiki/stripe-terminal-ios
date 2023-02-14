@@ -53,7 +53,9 @@ class PaymentViewController: EventDisplayingViewController {
             || Terminal.shared.connectedReader?.deviceType == .wisePosEDevKit
             || Terminal.shared.connectedReader?.deviceType == .etna
             || Terminal.shared.connectedReader?.deviceType == .stripeS700
-            || Terminal.shared.connectedReader?.deviceType == .stripeS700DevKit {
+            || Terminal.shared.connectedReader?.deviceType == .stripeS700DevKit
+            || true
+        {
             // For internet-connected readers, PaymentIntents must be created via your backend
             var createEvent = LogEvent(method: .backendCreatePaymentIntent)
             self.events.append(createEvent)
