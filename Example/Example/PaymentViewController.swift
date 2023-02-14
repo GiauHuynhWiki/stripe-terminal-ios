@@ -11,12 +11,12 @@ import Static
 import StripeTerminal
 
 class PaymentViewController: EventDisplayingViewController {
-
+    
     private let paymentParams: PaymentIntentParameters
     private let collectConfig: CollectConfiguration
     private let declineCardBrand: CardBrand?
     private let recollectAfterCardBrandDecline: Bool
-
+    
     init(paymentParams: PaymentIntentParameters,
          collectConfig: CollectConfiguration,
          declineCardBrand: CardBrand?,
@@ -27,26 +27,43 @@ class PaymentViewController: EventDisplayingViewController {
         self.recollectAfterCardBrandDecline = recollectAfterCardBrandDecline
         super.init()
     }
-
+    
     required init?(coder aDecoder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
     }
-
+    
     override func viewDidLoad() {
         super.viewDidLoad()
         self.addKeyboardDisplayObservers()
-
-        // 1. create PaymentIntent
-        createPaymentIntent(self.paymentParams) { intent, createError in
-            if createError != nil {
-                self.complete()
-            } else if let intent = intent {
-                // 2. collectPaymentMethod
-                self.collectPaymentMethod(intent: intent)
+        
+//        // 1. create PaymentIntent
+//        createPaymentIntent(self.paymentParams) { intent, createError in
+//            if createError != nil {
+//                self.complete()
+//            } else if let intent = intent {
+//                // 2. collectPaymentMethod
+//                self.collectPaymentMethod(intent: intent)
+//            }
+//        }
+        
+        // create Customer
+        var createEvent = LogEvent(method: .createCustomer)
+        AppDelegate.apiClient?.createCustomer { result in
+            switch result {
+            case .success(let customerId):
+                createEvent.result = .succeeded
+                createEvent.object = .object(customerId)
+                self.events.append(createEvent)
+                
+                self.saveCardOnCustomer(customerId) // wiki@testwiki.com
+            case .failure(let error):
+                createEvent.result = .errored
+                createEvent.object = .error(error as NSError)
+                self.events.append(createEvent)
             }
         }
     }
-
+    
     private func createPaymentIntent(_ parameters: PaymentIntentParameters, completion: @escaping PaymentIntentCompletionBlock) {
         if Terminal.shared.connectedReader?.deviceType == .verifoneP400
             || Terminal.shared.connectedReader?.deviceType == .wisePosE
@@ -59,7 +76,7 @@ class PaymentViewController: EventDisplayingViewController {
             // For internet-connected readers, PaymentIntents must be created via your backend
             var createEvent = LogEvent(method: .backendCreatePaymentIntent)
             self.events.append(createEvent)
-
+            
             AppDelegate.apiClient?.createPaymentIntent(parameters) { (result) in
                 switch result {
                 case .failure(let error):
@@ -67,12 +84,12 @@ class PaymentViewController: EventDisplayingViewController {
                     createEvent.object = .error(error as NSError)
                     self.events.append(createEvent)
                     completion(nil, error)
-
+                    
                 case .success(let clientSecret):
                     createEvent.result = .succeeded
                     createEvent.object = .object(clientSecret)
                     self.events.append(createEvent)
-
+                    
                     // and then retrieved w/Terminal SDK
                     var retrieveEvent = LogEvent(method: .retrievePaymentIntent)
                     self.events.append(retrieveEvent)
@@ -103,13 +120,13 @@ class PaymentViewController: EventDisplayingViewController {
                     createEvent.result = .succeeded
                     createEvent.object = .paymentIntent(intent)
                     self.events.append(createEvent)
-
+                    
                 }
                 completion(intent, error)
             }
         }
     }
-
+    
     private func collectPaymentMethod(intent: PaymentIntent) {
         var collectEvent = LogEvent(method: .collectPaymentMethod)
         self.events.append(collectEvent)
@@ -153,17 +170,17 @@ class PaymentViewController: EventDisplayingViewController {
                     }
                     return
                 }
-
+                
                 collectEvent.result = .succeeded
                 collectEvent.object = .paymentIntent(intent)
                 self.events.append(collectEvent)
-
+                
                 // 3. confirm PaymentIntent
                 self.confirmPaymentIntent(intent: intent)
             }
         }
     }
-
+    
     private func confirmPaymentIntent(intent: PaymentIntent) {
         var processEvent = LogEvent(method: .processPayment)
         self.events.append(processEvent)
@@ -178,10 +195,10 @@ class PaymentViewController: EventDisplayingViewController {
                     processEvent.result = .succeeded
                     processEvent.object = .paymentIntent(intent)
                     self.events.append(processEvent)
-                    #if SCP_SHOWS_RECEIPTS
+#if SCP_SHOWS_RECEIPTS
                     self.events.append(ReceiptEvent(refund: nil, paymentIntent: intent))
-                    #endif
-
+#endif
+                    
                     if intent.status == .requiresCapture {
                         // 4. send to backend for capture
                         self.capturePaymentIntent(intent: intent)
@@ -192,7 +209,7 @@ class PaymentViewController: EventDisplayingViewController {
                         // a single-message payment method, like Interac in Canada.
                         self.complete()
                     }
-
+                    
                     // Show a refund button if this was an Interac charge to make it easy to refund.
                     // Require iOS 16 since we're using a 16+ SF Symbol
                     if #available(iOS 16.0, *),
@@ -216,8 +233,8 @@ class PaymentViewController: EventDisplayingViewController {
             }
         }
     }
-
-
+    
+    
     private func capturePaymentIntent(intent: PaymentIntent) {
         var captureEvent = LogEvent(method: .capturePaymentIntent)
         self.events.append(captureEvent)
@@ -232,11 +249,38 @@ class PaymentViewController: EventDisplayingViewController {
             self.complete()
         }
     }
-
+    
     public func refund(chargeId: String, amount: UInt) {
         self.navigationController?.pushViewController(
             StartRefundViewController(chargeId: chargeId, amount: amount),
             animated: true
         )
+    }
+    
+    // Action for a "Save Card" button
+    func saveCardOnCustomer(_ customerId: String) {
+        let params = SetupIntentParameters(customer: customerId)
+        Terminal.shared.createSetupIntent(params) { createResult, createError in
+            if let error = createError {
+                print("createSetupIntent failed: \(error)")
+            } else if let setupIntent = createResult {
+                print("createSetupIntent succeeded")
+                self.cancelable = Terminal.shared.collectSetupIntentPaymentMethod(setupIntent, customerConsentCollected: true) { collectResult, collectError in
+                    if let error = collectError {
+                        print("collectSetupIntentPaymentMethod failed: \(error)")
+                    } else if let collectPaymentMethodPaymentIntent = collectResult {
+                        print("collectSetupIntentPaymentMethod succeeded")
+                        // ... Confirm the SetupIntent
+                        Terminal.shared.confirmSetupIntent(collectPaymentMethodPaymentIntent) { confirmResult, confirmError in
+                            if let error = confirmError {
+                                print("confirmSetupIntent failed: \(error)")
+                            } else if let processPaymentPaymentIntent = confirmResult {
+                                print("confirmSetupIntent succeeded: \(processPaymentPaymentIntent.stripeId)")
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 }

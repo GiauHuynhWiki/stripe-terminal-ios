@@ -88,7 +88,7 @@ class SetupIntentViewController: EventDisplayingViewController {
             })
         }
     }
-
+ 
     private func collectSetupIntent(intent: SetupIntent) {
         var collectEvent = LogEvent(method: .collectSetupIntentPaymentMethod)
         self.events.append(collectEvent)

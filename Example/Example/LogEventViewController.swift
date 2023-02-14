@@ -61,6 +61,7 @@ struct LogEvent: CustomStringConvertible, Event {
         case backendCreateSetupIntent = "backend.createSetupIntent"
         case retrieveSetupIntent = "backend.retrieveSetupIntent"
         case captureSetupIntent = "backend.captuteSetupIntent"
+        case createCustomer = "backend.createCustomer"
     }
 
     enum AssociatedObject {
@@ -234,7 +235,15 @@ struct LogEvent: CustomStringConvertible, Event {
             case .errored: string = "Capture SetupIntent Failed"
             case .message(let message): string = message
             }
+        case .createCustomer:
+            switch result {
+            case .started: string = "Create Customer Started"
+            case .succeeded: string = "Create Customer Succeeded"
+            case .errored: string = "Create Customer Errored"
+            case .message(let message): string = message
+            }
         }
+    
         return string
     }
 

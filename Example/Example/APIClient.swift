@@ -130,6 +130,27 @@ class APIClient: NSObject, ConnectionTokenProvider {
         }
     }
 
+    func createCustomer(completion: @escaping (Swift.Result<String, Error>) -> Void) {
+        let url = self.baseURL.appendingPathComponent("create_customer")
+        Alamofire.request(url, method: .post,
+                          parameters: [:])
+            .validate(statusCode: 200..<300)
+            .responseJSON { responseJSON in
+                switch responseJSON.result {
+                case .success(let json):
+                    if let json = json as? [String: Any], let customerId = json["id"] as? String {
+                        completion(.success(customerId))
+                    } else {
+                        let error = NSError(domain: "Can't parse json", code: 4)
+                        completion(.failure(error))
+                    }
+                case .failure(let error):
+                    completion(.failure(error))
+                    
+                }
+        }
+    }
+    
     func createSetupIntent(_ params: SetupIntentParameters, completion: @escaping (Swift.Result<String, Error>) -> Void) {
         var alamofireParams: Parameters = [
             "payment_method_types": [ "card_present" ],
