@@ -36,7 +36,7 @@ class PaymentViewController: EventDisplayingViewController {
         super.viewDidLoad()
         self.addKeyboardDisplayObservers()
         
-//        // 1. create PaymentIntent
+        // 1. create PaymentIntent
 //        createPaymentIntent(self.paymentParams) { intent, createError in
 //            if createError != nil {
 //                self.complete()
@@ -46,22 +46,22 @@ class PaymentViewController: EventDisplayingViewController {
 //            }
 //        }
         
-        // create Customer
-        var createEvent = LogEvent(method: .createCustomer)
-        AppDelegate.apiClient?.createCustomer { result in
-            switch result {
-            case .success(let customerId):
-                createEvent.result = .succeeded
-                createEvent.object = .object(customerId)
-                self.events.append(createEvent)
-                
-                self.saveCardOnCustomer(customerId) // wiki@testwiki.com
-            case .failure(let error):
-                createEvent.result = .errored
-                createEvent.object = .error(error as NSError)
-                self.events.append(createEvent)
+//
+        self.createCustomer { customerId in
+            self.createSetupIntent(customerId) {
+                self.listPaymentMethods(customerId) { paymentMethodId in
+                    self.setDefaultPaymentMethod(customerId, paymentMethodId: paymentMethodId) {
+                        self.createSubscription(customerId, priceId: "price_1MJqaVLugLZiZtEHXDImyCOU") { invoiceId in
+                            self.retrieveInvoice(invoiceId) { hostedInvoiceUrl in
+                                print("success retrieve Invoice: \(hostedInvoiceUrl)")
+                                self.complete()
+                            }
+                        }
+                    }
+                }
             }
         }
+        
     }
     
     private func createPaymentIntent(_ parameters: PaymentIntentParameters, completion: @escaping PaymentIntentCompletionBlock) {
@@ -257,25 +257,156 @@ class PaymentViewController: EventDisplayingViewController {
         )
     }
     
+    func createCustomer(completion: @escaping (String) -> ()) {
+        var event = LogEvent(method: .createCustomer)
+        self.events.append(event)
+        AppDelegate.apiClient?.createCustomer { result in
+            switch result {
+            case .success(let customerId):
+                event.result = .succeeded
+                event.object = .object(customerId)
+                self.events.append(event)
+                
+                completion(customerId)
+            case .failure(let error):
+                event.result = .errored
+                event.object = .error(error as NSError)
+                self.events.append(event)
+            }
+        }
+    }
+    
+    func retrieveCustomer(_ customerId: String, completion: @escaping (String) -> ()) {
+        var event = LogEvent(method: .retrieveCustomer)
+        self.events.append(event)
+        AppDelegate.apiClient?.retrieveCustomer(customerId) { result in
+            switch result {
+            case .success(let customerId):
+                event.result = .succeeded
+                event.object = .object(customerId)
+                self.events.append(event)
+                
+                completion(customerId)
+            case .failure(let error):
+                event.result = .errored
+                event.object = .error(error as NSError)
+                self.events.append(event)
+            }
+        }
+    }
+    
+    func listPaymentMethods(_ customerId: String, completion: @escaping (String) -> ()) {
+        var event = LogEvent(method: .listPaymentMethods)
+        self.events.append(event)
+        AppDelegate.apiClient?.listPaymentMethods(customerId) { result in
+            switch result {
+            case .success(let paymentMethodId):
+                event.result = .succeeded
+                event.object = .object(paymentMethodId)
+                self.events.append(event)
+                
+                completion(paymentMethodId)
+            case .failure(let error):
+                event.result = .errored
+                event.object = .error(error as NSError)
+                self.events.append(event)
+            }
+        }
+    }
+    
+    func setDefaultPaymentMethod(_ customerId: String, paymentMethodId: String, completion: @escaping () -> ()) {
+        var event = LogEvent(method: .setDefaultPaymentMethod)
+        self.events.append(event)
+        AppDelegate.apiClient?.setDefaultPaymentMethod(customerId, paymentMethodId: paymentMethodId) { result in
+            switch result {
+            case .success(let customerId):
+                event.result = .succeeded
+                event.object = .object(customerId)
+                self.events.append(event)
+                
+                completion()
+            case .failure(let error):
+                event.result = .errored
+                event.object = .error(error as NSError)
+                self.events.append(event)
+            }
+        }
+    }
+    
+    func createSubscription(_ customerId: String, priceId: String, completion: @escaping (String) -> ()) {
+        var event = LogEvent(method: .createSubscription)
+        self.events.append(event)
+        AppDelegate.apiClient?.createSubscription(customerId: customerId, priceId: priceId) { result in
+            switch result {
+            case .success(let invoiceId):
+                event.result = .succeeded
+                event.object = .object(invoiceId)
+                self.events.append(event)
+                
+                completion(invoiceId)
+            case .failure(let error):
+                event.result = .errored
+                event.object = .error(error as NSError)
+                self.events.append(event)
+            }
+        }
+    }
+    
+    func retrieveInvoice(_ invoiceId: String, completion: @escaping (String) -> ()) {
+        var event = LogEvent(method: .retrieveInvoice)
+        self.events.append(event)
+        AppDelegate.apiClient?.retrieveInvoice(invoiceId) { result in
+            switch result {
+            case .success(let hostedInvoiceUrl):
+                event.result = .succeeded
+                event.object = .object(hostedInvoiceUrl)
+                self.events.append(event)
+                
+                completion(hostedInvoiceUrl)
+            case .failure(let error):
+                event.result = .errored
+                event.object = .error(error as NSError)
+                self.events.append(event)
+            }
+        }
+    }
+
+
+    
     // Action for a "Save Card" button
-    func saveCardOnCustomer(_ customerId: String) {
+    func createSetupIntent(_ customerId: String, completion: @escaping() -> ()) {
+        var setupIntentEvent = LogEvent(method: .createSetupIntent)
+        self.events.append(setupIntentEvent)
+        
         let params = SetupIntentParameters(customer: customerId)
         Terminal.shared.createSetupIntent(params) { createResult, createError in
             if let error = createError {
                 print("createSetupIntent failed: \(error)")
+                setupIntentEvent.result = .errored
+                self.events.append(setupIntentEvent)
+                
             } else if let setupIntent = createResult {
-                print("createSetupIntent succeeded")
+                print("createSetupIntent succeeded: \(setupIntent)")
                 self.cancelable = Terminal.shared.collectSetupIntentPaymentMethod(setupIntent, customerConsentCollected: true) { collectResult, collectError in
                     if let error = collectError {
                         print("collectSetupIntentPaymentMethod failed: \(error)")
+                        setupIntentEvent.result = .errored
+                        self.events.append(setupIntentEvent)
+                        
                     } else if let collectPaymentMethodPaymentIntent = collectResult {
                         print("collectSetupIntentPaymentMethod succeeded")
                         // ... Confirm the SetupIntent
                         Terminal.shared.confirmSetupIntent(collectPaymentMethodPaymentIntent) { confirmResult, confirmError in
                             if let error = confirmError {
                                 print("confirmSetupIntent failed: \(error)")
+                                setupIntentEvent.result = .errored
+                                self.events.append(setupIntentEvent)
+                                
                             } else if let processPaymentPaymentIntent = confirmResult {
-                                print("confirmSetupIntent succeeded: \(processPaymentPaymentIntent.stripeId)")
+                                print("confirmSetupIntent succeeded: \(processPaymentPaymentIntent.stripeId) - \(processPaymentPaymentIntent)")
+                                setupIntentEvent.result = .succeeded
+                                self.events.append(setupIntentEvent)
+                                completion()
                             }
                         }
                     }
@@ -283,4 +414,6 @@ class PaymentViewController: EventDisplayingViewController {
             }
         }
     }
+    
+    
 }

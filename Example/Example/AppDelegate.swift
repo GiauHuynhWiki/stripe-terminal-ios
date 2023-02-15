@@ -57,3 +57,20 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     }
 
 }
+
+func JSONStringify(_ value: Any, prettyPrinted: Bool = false) -> String {
+    guard JSONSerialization.isValidJSONObject(value) else { return "" }
+
+    if prettyPrinted {
+        if let data = try? JSONSerialization.data(withJSONObject: value, options: .prettyPrinted)
+            , let string = NSString(data: data, encoding: NSUTF8StringEncoding) {
+            return string as String
+        }
+    } else {
+        if let data = try? JSONSerialization.data(withJSONObject: value)
+            , let string = NSString(data: data, encoding: NSUTF8StringEncoding) {
+            return string as String
+        }
+    }
+    return ""
+}

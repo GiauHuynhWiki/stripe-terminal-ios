@@ -62,6 +62,12 @@ struct LogEvent: CustomStringConvertible, Event {
         case retrieveSetupIntent = "backend.retrieveSetupIntent"
         case captureSetupIntent = "backend.captuteSetupIntent"
         case createCustomer = "backend.createCustomer"
+        case retrieveCustomer = "backend.retrieveCustomer"
+        case listPaymentMethods = "backend.listPaymentMethods"
+        case setDefaultPaymentMethod = "backend.setDefaultPaymentMethod"
+        case createSubscription = "backend.createSubscription"
+        case retrieveInvoice = "backend.retrieveInvoice"
+
     }
 
     enum AssociatedObject {
@@ -242,6 +248,42 @@ struct LogEvent: CustomStringConvertible, Event {
             case .errored: string = "Create Customer Errored"
             case .message(let message): string = message
             }
+        case .retrieveCustomer:
+            switch result {
+            case .started: string = "Retrieve Customer Started"
+            case .succeeded: string = "Retrieve Customer Succeeded"
+            case .errored: string = "Retrieve Customer Errored"
+            case .message(let message): string = message
+            }
+        case .listPaymentMethods:
+            switch result {
+            case .started: string = "List Payment Methods Started"
+            case .succeeded: string = "List Payment Methods Succeeded"
+            case .errored: string = "List Payment Methods Errored"
+            case .message(let message): string = message
+            }
+        case .setDefaultPaymentMethod:
+            switch result {
+            case .started: string = "Set Default Payment Method Started"
+            case .succeeded: string = "Set Default Payment Method Succeeded"
+            case .errored: string = "Set Default Payment Method Errored"
+            case .message(let message): string = message
+            }
+        case .createSubscription:
+            switch result {
+            case .started: string = "Create Subscription Started"
+            case .succeeded: string = "Create Subscription Succeeded"
+            case .errored: string = "Create Subscription Errored"
+            case .message(let message): string = message
+            }
+        case .retrieveInvoice:
+            switch result {
+            case .started: string = "Retrieve Invoice Started"
+            case .succeeded: string = "Retrieve Invoice Succeeded"
+            case .errored: string = "Retrieve Invoice Errored"
+            case .message(let message): string = message
+            }
+
         }
     
         return string

@@ -146,7 +146,121 @@ class APIClient: NSObject, ConnectionTokenProvider {
                     }
                 case .failure(let error):
                     completion(.failure(error))
-                    
+                }
+        }
+    }
+    
+    func retrieveCustomer(_ customerId: String, completion: @escaping (Swift.Result<String, Error>) -> Void) {
+        let url = self.baseURL.appendingPathComponent("retrieve_customer")
+        Alamofire.request(url, method: .get,
+                          parameters: [
+                            "customer_id": customerId,
+                          ])
+            .validate(statusCode: 200..<300)
+            .responseJSON { responseJSON in
+                switch responseJSON.result {
+                case .success(let json):
+                    print("retrieve success: \(JSONStringify(json))")
+                    if let json = json as? [String: Any], let customerId = json["id"] as? String {
+                        completion(.success(customerId))
+                    } else {
+                        let error = NSError(domain: "Can't parse json", code: 4)
+                        completion(.failure(error))
+                    }
+                case .failure(let error):
+                    completion(.failure(error))
+                }
+        }
+    }
+    
+    func listPaymentMethods(_ customerId: String, completion: @escaping (Swift.Result<String, Error>) -> Void) {
+        let url = self.baseURL.appendingPathComponent("list_payment_methods")
+        Alamofire.request(url, method: .get,
+                          parameters: [
+                            "customer_id": customerId,
+                          ])
+            .validate(statusCode: 200..<300)
+            .responseJSON { responseJSON in
+                switch responseJSON.result {
+                case .success(let json):
+                    print("retrieve success: \(JSONStringify(json))")
+                    if let json = json as? [String: Any],
+                        let list = json["data"] as? [[String: Any]],
+                        let firstPaymentMethod = list.first,
+                        let paymentMethodId = firstPaymentMethod["id"] as? String {
+                        completion(.success(paymentMethodId))
+                    } else {
+                        let error = NSError(domain: "Can't parse json", code: 4)
+                        completion(.failure(error))
+                    }
+                case .failure(let error):
+                    completion(.failure(error))
+                }
+        }
+    }
+    
+    func setDefaultPaymentMethod(_ customerId: String, paymentMethodId: String, completion: @escaping (Swift.Result<String, Error>) -> Void) {
+        let url = self.baseURL.appendingPathComponent("set_default_payment_method")
+        Alamofire.request(url, method: .post,
+                          parameters: [
+                            "customer_id": customerId,
+                            "payment_method_id": paymentMethodId
+                          ])
+            .validate(statusCode: 200..<300)
+            .responseJSON { responseJSON in
+                switch responseJSON.result {
+                case .success(let json):
+                    if let json = json as? [String: Any], let customerId = json["id"] as? String {
+                        completion(.success(customerId))
+                    } else {
+                        let error = NSError(domain: "Can't parse json", code: 4)
+                        completion(.failure(error))
+                    }
+                case .failure(let error):
+                    completion(.failure(error))
+                }
+        }
+    }
+    
+    func createSubscription(customerId: String, priceId: String, completion: @escaping (Swift.Result<String, Error>) -> Void) {
+        let url = self.baseURL.appendingPathComponent("create_subscription")
+        Alamofire.request(url, method: .post,
+                          parameters: ["customer_key": customerId,
+                                       "price_key": priceId])
+            .validate(statusCode: 200..<300)
+            .responseJSON { responseJSON in
+                switch responseJSON.result {
+                case .success(let json):
+                    if let json = json as? [String: Any], let invoiceId = json["latest_invoice"] as? String {
+                        completion(.success(invoiceId))
+                    } else {
+                        let error = NSError(domain: "Can't parse json", code: 4)
+                        completion(.failure(error))
+                    }
+                case .failure(let error):
+                    completion(.failure(error))
+                }
+        }
+    }
+    
+    func retrieveInvoice(_ invoiceId: String, completion: @escaping (Swift.Result<String, Error>) -> Void) {
+        let url = self.baseURL.appendingPathComponent("retrieve_invoice")
+        Alamofire.request(url, method: .get,
+                          parameters: [
+                            "invoice_id": invoiceId,
+                          ])
+            .validate(statusCode: 200..<300)
+            .responseJSON { responseJSON in
+                switch responseJSON.result {
+                case .success(let json):
+                    if let json = json as? [String: Any], let hostedInvoiceUrl = json["hosted_invoice_url"] as? String {
+                        completion(.success(hostedInvoiceUrl))
+                    } else {
+                        let error = NSError(domain: "Can't parse json", code: 4)
+                        completion(.failure(error))
+                    }
+                case .failure(let error):
+                    completion(.failure(error))
                 }
         }
     }
